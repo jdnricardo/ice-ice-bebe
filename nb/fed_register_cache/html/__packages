@@ -1,0 +1,14 @@
+base
+magrittr
+dplyr
+tidyr
+purrr
+tidytext
+xml2
+rvest
+robotstxt
+ggplot2
+ggraph
+igraph
+ochRe
+dutchmasters
