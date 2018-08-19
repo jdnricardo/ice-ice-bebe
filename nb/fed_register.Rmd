@@ -30,7 +30,11 @@ theme_set(theme_grey() +
                   panel.grid.major.x = element_line(colour = dutchmasters$little_street[[11]])))
 ```
 
+Playing around with some data for theming plots, trying out network graphs.
+
 ## Scraping agency names
+
+Makes use of US Federal Register
 
 ```{r agency_list, cache=TRUE}
 fed_reg_url <- "https://www.federalregister.gov"
@@ -60,6 +64,8 @@ tidy_agency_bigram <- agencies %>%
 
 ### Single-word frequency
 
+Showing the top 25 single words, highlighting some choice ones.
+
 ```{r agency_word_plot}
 tidy_agencies %>% 
   count(word, sort = TRUE) %>% 
@@ -75,6 +81,8 @@ tidy_agencies %>%
 ```
 
 ### Bigram frequency
+
+And some choice relationships among the top 75 word pairs.
 
 ```{r agency_network, fig.width=10, fig.height=8}
 tidy_agency_bigram %>% 

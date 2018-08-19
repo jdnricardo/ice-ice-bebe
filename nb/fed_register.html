@@ -236,13 +236,15 @@ div.tocify {
 
 
 <h1 class="title toc-ignore">Agencies in the US Federal Register</h1>
-<h4 class="date"><em>Last updated: 2018-08-11</em></h4>
+<h4 class="date"><em>Last updated: 2018-08-19</em></h4>
 
 </div>
 
 
+<p>Playing around with some data for theming plots, trying out network graphs.</p>
 <div id="scraping-agency-names" class="section level2">
 <h2>Scraping agency names</h2>
+<p>Makes use of US Federal Register</p>
 <pre class="r"><code>fed_reg_url &lt;- &quot;https://www.federalregister.gov&quot;
 
 if(!get_robotstxt(fed_reg_url) %&gt;% grepl(&quot;\\/agencies&quot;)) {
@@ -304,6 +306,7 @@ tidy_agency_bigram &lt;- agencies %&gt;%
   filter(!(word1 %in% stop_words$word | word2 %in% stop_words$word))</code></pre>
 <div id="single-word-frequency" class="section level3">
 <h3>Single-word frequency</h3>
+<p>Showing the top 25 single words, highlighting some choice ones.</p>
 <pre class="r"><code>tidy_agencies %&gt;% 
   count(word, sort = TRUE) %&gt;% 
   slice(1:25) %&gt;% 
@@ -319,6 +322,7 @@ tidy_agency_bigram &lt;- agencies %&gt;%
 </div>
 <div id="bigram-frequency" class="section level3">
 <h3>Bigram frequency</h3>
+<p>And some choice relationships among the top 75 word pairs.</p>
 <pre class="r"><code>tidy_agency_bigram %&gt;% 
   count(word1, word2, sort = TRUE) %&gt;% 
   slice(1:75) %&gt;% 
