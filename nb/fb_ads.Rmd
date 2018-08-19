@@ -1,0 +1,128 @@
+---
+title: "ProPublica Facebook Ad Collector"
+date: "Last updated: `r Sys.Date()`"
+output: 
+  html_document:
+    code_folding: hide
+    toc: true
+    toc_float: true
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(magrittr)
+library(dplyr)
+library(lubridate)
+library(tidyr)
+library(purrr)
+library(xray)
+library(feather)
+library(ggplot2)
+library(scales)
+library(htmlwidgets)
+library(ochRe)
+library(dutchmasters)
+set.seed(2018)
+
+source("../inst/load_propub_fb.R")
+
+theme_set(theme_grey() + 
+            theme(panel.background = element_rect(fil = dutchmasters$little_street[[2]]),
+                  panel.grid = element_blank(),
+                  panel.grid.major.y = element_line(colour = dutchmasters$little_street[[11]])))
+```
+
+```{r sample_ad_db}
+ads_sample <- ads_feather() %>% 
+  sample_frac(0.05) %>% 
+  mutate_at(vars(matches("(created|updated)_at")), ~ sub("\\..*", "", .)) %>% 
+  mutate_at(vars(matches("(created|updated)_at")), ymd_hms)
+```
+
+Let's just work with a random sample of 5% of the original dataset (`r as.numeric(nrow(ads_sample)/0.05)` rows).
+
+## First-pass data summary
+
+Looking at the volume of ads and impressions over time, regardless of whether it's marked as political by some indicator variable.
+
+```{r ad_vol_basic, fig.asp=0.5}
+ads_sample %>%
+  group_by(wk = round_date(created_at, "1 week")) %>% 
+  summarise(ads = n()) %>% 
+  ggplot(aes(wk, ads)) +
+  geom_bar(stat = "identity",
+           fill = dutchmasters$little_street[[5]],
+           alpha = 1/1.2) +
+  geom_smooth(method = "loess", span = 0.6,
+              colour = dutchmasters$little_street[[1]],
+              se = FALSE, size = 1.1) +
+  scale_y_continuous(breaks = pretty_breaks(4)) +
+  labs(x = NULL, y = "# of Ads",
+       title = "Weekly Ad Volume")
+```
+
+```{r impressions_vol_basic, fig.asp=0.56}
+ads_sample %>%
+  group_by(wk = round_date(created_at, "1 week")) %>% 
+  summarise(impressions = sum(impressions)) %>% 
+  ggplot(aes(wk, impressions)) +
+  geom_bar(stat = "identity",
+           fill = dutchmasters$little_street[[5]],
+           alpha = 1/1.2) +
+  geom_smooth(method = "loess", span = 0.6,
+              colour = dutchmasters$little_street[[1]],
+              se = FALSE, size = 1.1) +
+  scale_y_log10(breaks = c(10,100,1e3,1e4)) +
+  labs(x = NULL, y = "# of Impressions",
+       title = "Weekly Impression Volume",
+       subtitle = "log scale",
+       caption = "Source: ProPublica Facebook Political Ad Collector")
+```
+
+And we can look at the weekly distribution of political ratings (based on the ProPublica classifier)
+
+```{r political_frac}
+ads_sample %>% 
+  mutate(wk = round_date(created_at, "week")) %>% 
+  ggplot(aes(created_at,
+             political_probability)) +
+  geom_boxplot(aes(group = wk),
+               fill = dutchmasters$little_street[[5]],
+               colour = dutchmasters$little_street[[6]],
+               outlier.shape = NA) +
+  geom_smooth(method = "loess", span = 0.5,
+              colour = dutchmasters$little_street[[1]],
+              se = FALSE, size = 1.1) +
+  labs(x = NULL, y = NULL,
+       title = "Political Probability of Ads",
+       subtitle = "as classified by ProPublica Facebook Ad Collector",
+       caption = "*dataset excludes ads with probability < 70%") +
+  scale_y_continuous(labels = percent)
+```
+
+## Future work
+
+- Highlighting weekly summary with notable events (i.e. special elections, particular ad buyers)
+- Relationship between political probability and ad / impression volume
+- Targets, advertisers, paid for by (and their relationships in time, with probability/vol/etc)
+
+## In the weeds...
+
+#### Numeric columns
+
+```{r dists}
+quiet_dist <- quietly(function(.x) distributions(.x, charts = FALSE))
+
+ads_sample %>% 
+  select_if(is.numeric) %>% 
+  quiet_dist() %$% 
+  DT::datatable(result, options = list(dom = "ft"))
+```
+
+#### Anomalies
+
+```{r anomalies}
+anomalies(ads_sample, 0.85, 1)[["variables"]] %>% 
+  DT::datatable(extensions = c("Buttons", "Responsive"),
+                options = list(dom = "Bft", buttons = I("colvis")))
+```
