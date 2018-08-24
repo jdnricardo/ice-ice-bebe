@@ -9,8 +9,9 @@ output:
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE)
 library(magrittr)
+library(data.table)
 library(dplyr)
 library(lubridate)
 library(tidyr)
@@ -33,71 +34,120 @@ theme_set(theme_grey() +
 ```
 
 ```{r sample_ad_db}
-ads_sample <- ads_feather() %>% 
-  sample_frac(0.05) %>% 
-  mutate_at(vars(matches("(created|updated)_at")), ~ sub("\\..*", "", .)) %>% 
-  mutate_at(vars(matches("(created|updated)_at")), ymd_hms)
-```
+ads_sample <- data.table(ads_feather())
+# ads_sample <- ads_sample[, sampl_grp := sample(1:2, nrow(ads_sample), replace = TRUE)][sampl_grp == 1]
+ads_sample <- ads_sample[, ':=' (created_at = ymd_hms(created_at),
+                                 updated_at = ymd_hms(updated_at))]
+setkey(ads_sample, created_at)
 
-Let's just work with a random sample of 5% of the original dataset (`r as.numeric(nrow(ads_sample)/0.05)` rows).
+ads_sample <- ads_sample[created_at >= ymd("2017-10-01"), wk :=  round_date(created_at, "1 week")][!is.na(wk)]
+```
 
 ## First-pass data summary
 
-Looking at the volume of ads and impressions over time, regardless of whether it's marked as political by some indicator variable.
+Looking at the volume of ads over time, ignoring all other variables. Such general increase, with surprising lull over 2017 holiday period and sharp drop in April 2018.
 
 ```{r ad_vol_basic, fig.asp=0.5}
-ads_sample %>%
-  group_by(wk = round_date(created_at, "1 week")) %>% 
-  summarise(ads = n()) %>% 
-  ggplot(aes(wk, ads)) +
+ads_sample[, .N, by = wk] %>% 
+  ggplot(aes(wk, N)) +
   geom_bar(stat = "identity",
-           fill = dutchmasters$little_street[[5]],
+           fill = dutchmasters$little_street[[3]],
            alpha = 1/1.2) +
-  geom_smooth(method = "loess", span = 0.6,
-              colour = dutchmasters$little_street[[1]],
-              se = FALSE, size = 1.1) +
+  geom_smooth(method = "loess",
+              colour = dutchmasters$little_street[[8]],
+              size = 1.1) +
+  scale_x_datetime(date_breaks = "2 months", date_labels = "%b %Y") +
   scale_y_continuous(breaks = pretty_breaks(4)) +
   labs(x = NULL, y = "# of Ads",
        title = "Weekly Ad Volume")
 ```
 
+Looking at the impressions over time, ignoring all other variables. Such general stability after heavy period in last quarter of 2017. Similar dips as previous graph during 2017 holiday period and April 2018.
+
 ```{r impressions_vol_basic, fig.asp=0.56}
-ads_sample %>%
-  group_by(wk = round_date(created_at, "1 week")) %>% 
-  summarise(impressions = sum(impressions)) %>% 
+ads_sample[,  .(impressions=sum(as.numeric(impressions))), by = wk] %>% 
   ggplot(aes(wk, impressions)) +
   geom_bar(stat = "identity",
-           fill = dutchmasters$little_street[[5]],
+           fill = dutchmasters$little_street[[3]],
            alpha = 1/1.2) +
-  geom_smooth(method = "loess", span = 0.6,
-              colour = dutchmasters$little_street[[1]],
-              se = FALSE, size = 1.1) +
-  scale_y_log10(breaks = c(10,100,1e3,1e4)) +
+  geom_smooth(method = "loess",
+              colour = dutchmasters$little_street[[8]],
+              size = 1.1) +
+  scale_x_datetime(date_breaks = "2 months", date_labels = "%b %Y") +
+  scale_y_log10(breaks = c(1e1,1e2,1e3,1e4)) +
+  annotation_logticks(sides = "l", 
+                      colour = dutchmasters$little_street[[5]]) +
   labs(x = NULL, y = "# of Impressions",
        title = "Weekly Impression Volume",
        subtitle = "log scale",
        caption = "Source: ProPublica Facebook Political Ad Collector")
 ```
 
-And we can look at the weekly distribution of political ratings (based on the ProPublica classifier)
+And we can look at the weekly distribution of political ratings rated as "political" based on the ProPublica classifier (probability of 70% or more).
 
 ```{r political_frac}
-ads_sample %>% 
-  mutate(wk = round_date(created_at, "week")) %>% 
-  ggplot(aes(created_at,
-             political_probability)) +
-  geom_boxplot(aes(group = wk),
-               fill = dutchmasters$little_street[[5]],
-               colour = dutchmasters$little_street[[6]],
-               outlier.shape = NA) +
-  geom_smooth(method = "loess", span = 0.5,
-              colour = dutchmasters$little_street[[1]],
-              se = FALSE, size = 1.1) +
+ads_sample[, .(median=median(political_probability),
+               qnt05=quantile(political_probability,0.05),
+               qnt25=quantile(political_probability,0.25),
+               qnt75=quantile(political_probability,0.75),
+               qnt95=quantile(political_probability,0.95)), by = wk] %>% 
+  ggplot(aes(wk)) +
+  geom_ribbon(aes(ymin = qnt05, ymax = qnt95),
+              fill = dutchmasters$little_street[[3]],
+              alpha = 1/3) +
+  geom_ribbon(aes(ymin = qnt25, ymax = qnt75),
+              fill = dutchmasters$little_street[[3]],
+              alpha = 1/2) +
+  geom_line(aes(y = median),
+            size = 1.1,
+            colour = dutchmasters$little_street[[8]]) +
+  scale_x_datetime(date_breaks = "2 months", date_labels = "%b %Y",
+                   expand = c(0,0)) +
+  scale_y_continuous(labels = percent, expand = c(0.025,0)) +
+  coord_cartesian(ylim = c(0.7,1)) +
   labs(x = NULL, y = NULL,
-       title = "Political Probability of Ads",
+       title = "Weekly Median Political Probability of Ads",
        subtitle = "as classified by ProPublica Facebook Ad Collector",
-       caption = "*dataset excludes ads with probability < 70%") +
-  scale_y_continuous(labels = percent)
+       caption = paste0("*dataset excludes ads with probability < 70%",
+                        "; ribbons show 5th, 25th, 75th, and 95th percentile"))
+```
+
+## Feature generation
+
+Beginning work to tease out features in dataset
+
+- Weekly impressions per ad over time
+
+Looks like someone at Facebook or ProPublica changed something in an algorithm in Dec 2017?
+
+```{r}
+ads_sample[, .(impresh_by_vol = sum(impressions)/.N), by = wk] %>% 
+  ggplot(aes(wk, impresh_by_vol)) +
+  geom_bar(stat = "identity",
+           fill = dutchmasters$little_street[[3]],
+           alpha = 1/1.2) +
+  geom_smooth(method = "loess",
+              colour = dutchmasters$little_street[[8]],
+              size = 1.1) +
+  scale_x_datetime(date_breaks = "2 months", date_labels = "%b %Y") +
+  scale_y_sqrt(breaks = c(1,2,5,10,20,50,100)) +
+  labs(x = NULL, y = "Impressions per Ad",
+       title = "Weekly Impressions per Ad",
+       subtitle = "log scale",
+       caption = "Source: ProPublica Facebook Political Ad Collector")
+```
+
+## Ad targeting
+
+Beginning work to unpack ad targets. Currently parsing (crudely) with regex, but maybe it's in a recognizable format that can be parsed another way?
+
+```{r ad_targets}
+ads_sample[grepl("\\w", targets), targets] %>% 
+  head() %>% 
+  gsub('([":\\}\\]|,\\s|List)', "", .) %>%
+  strsplit('[\\{\\}\\[]*(\\{target|segment)') %>%
+  map( ~ unlist(.x) %>% 
+         .[grepl("[A-Za-z0-9]", .)])
 ```
 
 ## Future work
