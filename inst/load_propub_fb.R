@@ -1,7 +1,6 @@
 # Loading raw FB ads file for cleaning and saving as database
 library(xlsx)
 library(feather)
-library(RSQLite)
 
 ## Typically run from R or nb folders, one directory up
 ads_file_nm <- "../inst/extdata/fbpac-ads-en-US"

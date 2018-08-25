@@ -28,9 +28,9 @@ set.seed(2018)
 source("../inst/load_propub_fb.R")
 
 theme_set(theme_grey() + 
-            theme(panel.background = element_rect(fil = dutchmasters$little_street[[2]]),
+            theme(panel.background = element_rect(fil = dutchmasters$milkmaid[[7]]),
                   panel.grid = element_blank(),
-                  panel.grid.major.y = element_line(colour = dutchmasters$little_street[[11]])))
+                  panel.grid.major.y = element_line(colour = dutchmasters$milkmaid[[6]])))
 ```
 
 ```{r sample_ad_db}
@@ -51,10 +51,10 @@ Looking at the volume of ads over time, ignoring all other variables. Such gener
 ads_sample[, .N, by = wk] %>% 
   ggplot(aes(wk, N)) +
   geom_bar(stat = "identity",
-           fill = dutchmasters$little_street[[3]],
+           fill = dutchmasters$milkmaid[[8]],
            alpha = 1/1.2) +
   geom_smooth(method = "loess",
-              colour = dutchmasters$little_street[[8]],
+              colour = dutchmasters$milkmaid[[1]],
               size = 1.1) +
   scale_x_datetime(date_breaks = "2 months", date_labels = "%b %Y") +
   scale_y_continuous(breaks = pretty_breaks(4)) +
@@ -68,15 +68,15 @@ Looking at the impressions over time, ignoring all other variables. Such general
 ads_sample[,  .(impressions=sum(as.numeric(impressions))), by = wk] %>% 
   ggplot(aes(wk, impressions)) +
   geom_bar(stat = "identity",
-           fill = dutchmasters$little_street[[3]],
+           fill = dutchmasters$milkmaid[[8]],
            alpha = 1/1.2) +
   geom_smooth(method = "loess",
-              colour = dutchmasters$little_street[[8]],
+              colour = dutchmasters$milkmaid[[1]],
               size = 1.1) +
   scale_x_datetime(date_breaks = "2 months", date_labels = "%b %Y") +
   scale_y_log10(breaks = c(1e1,1e2,1e3,1e4)) +
   annotation_logticks(sides = "l", 
-                      colour = dutchmasters$little_street[[5]]) +
+                      colour = dutchmasters$milkmaid[[6]]) +
   labs(x = NULL, y = "# of Impressions",
        title = "Weekly Impression Volume",
        subtitle = "log scale",
@@ -93,14 +93,14 @@ ads_sample[, .(median=median(political_probability),
                qnt95=quantile(political_probability,0.95)), by = wk] %>% 
   ggplot(aes(wk)) +
   geom_ribbon(aes(ymin = qnt05, ymax = qnt95),
-              fill = dutchmasters$little_street[[3]],
+              fill = dutchmasters$milkmaid[[8]],
               alpha = 1/3) +
   geom_ribbon(aes(ymin = qnt25, ymax = qnt75),
-              fill = dutchmasters$little_street[[3]],
+              fill = dutchmasters$milkmaid[[8]],
               alpha = 1/2) +
   geom_line(aes(y = median),
             size = 1.1,
-            colour = dutchmasters$little_street[[8]]) +
+            colour = dutchmasters$milkmaid[[1]]) +
   scale_x_datetime(date_breaks = "2 months", date_labels = "%b %Y",
                    expand = c(0,0)) +
   scale_y_continuous(labels = percent, expand = c(0.025,0)) +
@@ -124,10 +124,10 @@ Looks like someone at Facebook or ProPublica changed something in an algorithm i
 ads_sample[, .(impresh_by_vol = sum(impressions)/.N), by = wk] %>% 
   ggplot(aes(wk, impresh_by_vol)) +
   geom_bar(stat = "identity",
-           fill = dutchmasters$little_street[[3]],
+           fill = dutchmasters$milkmaid[[8]],
            alpha = 1/1.2) +
   geom_smooth(method = "loess",
-              colour = dutchmasters$little_street[[8]],
+              colour = dutchmasters$milkmaid[[1]],
               size = 1.1) +
   scale_x_datetime(date_breaks = "2 months", date_labels = "%b %Y") +
   scale_y_sqrt(breaks = c(1,2,5,10,20,50,100)) +
