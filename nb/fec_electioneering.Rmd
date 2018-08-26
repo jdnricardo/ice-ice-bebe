@@ -1,0 +1,76 @@
+---
+title: "FEC csv cleaning"
+author: "Julian Ricardo"
+date: "August 25, 2018"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+source("../inst/fec_ftp.R")
+library(forcats)
+library(ggplot2)
+library(scales)
+library(ochRe)
+library(dutchmasters)
+set.seed(2018)
+
+csv_locn_local <- "../inst/extdata/csv/"
+
+theme_set(theme_grey() + 
+            theme(panel.background = element_rect(fil = dutchmasters$milkmaid[[7]]),
+                  panel.grid = element_blank(),
+                  panel.grid.major.x = element_line(colour = dutchmasters$milkmaid[[1]])))
+```
+
+```{r electioneering_data_io}
+electioneering <- fec_as_csv(csv_locn_local, fec_paths("[Ee]lectioneering")) %>% 
+  map( ~ setNames(.x, gsub("\\.", "", tolower(names(.x)))))
+  
+electioneering_main <- data.table(electioneering[[1]])
+
+# Cleaning filer identifiers
+elect_filer_cols <- grep("^filer_(?!state)", names(electioneering_main),
+                         value = TRUE, perl = TRUE)
+electioneering_main[, c(elect_filer_cols) := lapply(.SD,
+                                                   function(x){
+                                                     gsub("([A-Z])([A-Z]+)", "\\1\\L\\2", 
+                                                         x, perl = TRUE)
+                                                   }),
+                    .SDcols = (elect_filer_cols)]
+
+## Cleaning money
+elect_money_cols <- grep("^total_", names(electioneering_main), value = TRUE)
+
+## Cleaning dates
+elect_date_cols <- grep("_dt$", names(electioneering_main), value = TRUE)
+electioneering_main[, c(elect_date_cols) := lapply(.SD,
+                                              function(x){
+                                                sub("([A-Z])([A-Z]+)", "\\1\\L\\2", 
+                                                    x, perl = TRUE)
+                                              }),
+               .SDcols = (elect_date_cols)]
+
+# electioneering[, c(elect_date_cols) := lapply(.SD,
+#                                               function(x){
+#                                                 as_datetime(x, format = "%d-%b-%y")
+#                                               }),
+#                .SDcols = (elect_date_cols)]
+```
+
+## Prelim info from main electioneering communications dataset
+
+```{r electioneering_prelim, fig.asp=1.333}
+electioneering_main[total_disbursements_this_stmt > 0,
+                    lapply(.SD,
+                           function(x){
+                             sum(x, na.rm = TRUE)
+                           }),
+                    .SDcols = (elect_money_cols), by = "filer_state"] %>% 
+  ggplot(aes(fct_reorder(filer_state, total_disbursements_this_stmt),
+             total_disbursements_this_stmt)) +
+  geom_bar(stat = "identity", fill = dutchmasters$milkmaid[2]) +
+  scale_x_discrete(NULL) +
+  scale_y_log10(NULL, breaks = c(1e4, 1e5, 1e6, 1e7, 1e8), labels = dollar) +
+  coord_flip(ylim = c(1e4,5e8))
+```
