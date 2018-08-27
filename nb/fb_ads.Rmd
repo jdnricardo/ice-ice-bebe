@@ -1,11 +1,13 @@
 ---
 title: "ProPublica Facebook Ad Collector"
-date: "Last updated: `r Sys.Date()`"
-output: 
+output:
   html_document:
     code_folding: hide
-    toc: true
-    toc_float: true
+    toc: yes
+    toc_float: yes
+  pdf_document:
+    toc: yes
+date: 'Last updated: `r Sys.Date()`'
 ---
 
 ```{r setup, include=FALSE}
