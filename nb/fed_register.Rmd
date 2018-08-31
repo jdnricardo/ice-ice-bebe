@@ -1,11 +1,14 @@
 ---
 title: "Agencies in the US Federal Register"
-date: "Last updated: `r Sys.Date()`"
-output: 
+output:
   html_document:
+    df_print: paged
+    toc: yes
+  html_notebook:
     code_folding: hide
-    toc: true
-    toc_float: true
+    toc: yes
+    toc_float: yes
+date: 'Last updated: `r Sys.Date()`'
 ---
 
 ```{r setup, include=FALSE}
@@ -36,7 +39,7 @@ Playing around with some data for theming plots, trying out network graphs.
 
 Makes use of US Federal Register
 
-```{r agency_list, cache=TRUE}
+```{r agency_list}
 fed_reg_url <- "https://www.federalregister.gov"
 
 if(!get_robotstxt(fed_reg_url) %>% grepl("\\/agencies")) {
