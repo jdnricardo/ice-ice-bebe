@@ -2,11 +2,19 @@
 title: "ProPublica Facebook Ad Collector"
 output:
   html_document:
+<<<<<<< HEAD
     df_print: paged
     toc: yes
   html_notebook:
     toc: yes
     toc_float: yes
+=======
+    code_folding: hide
+    toc: yes
+    toc_float: yes
+  pdf_document:
+    toc: yes
+>>>>>>> 73ea554a1138b0e63962394ff701b435291e4e65
 date: 'Last updated: `r Sys.Date()`'
 ---
 
