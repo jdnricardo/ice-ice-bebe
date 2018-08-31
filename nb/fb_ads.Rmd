@@ -1,11 +1,13 @@
 ---
 title: "ProPublica Facebook Ad Collector"
-date: "Last updated: `r Sys.Date()`"
-output: 
+output:
   html_document:
-    code_folding: hide
-    toc: true
-    toc_float: true
+    df_print: paged
+    toc: yes
+  html_notebook:
+    toc: yes
+    toc_float: yes
+date: 'Last updated: `r Sys.Date()`'
 ---
 
 ```{r setup, include=FALSE}
@@ -24,7 +26,11 @@ library(htmlwidgets)
 library(ochRe)
 library(dutchmasters)
 set.seed(2018)
+```
 
+At the moment, loading either format of the FB dataset first requires downloading the csv from ProPublica to the directory `/inst/extdata/csv` before sourcing the `load_propub_fb.R` script,
+
+```{r source_script}
 source("../inst/load_propub_fb.R")
 
 theme_set(theme_grey() + 
@@ -33,8 +39,21 @@ theme_set(theme_grey() +
                   panel.grid.major.y = element_line(colour = dutchmasters$milkmaid[[6]])))
 ```
 
+```{r data_load}
+load_from <- "feather" # "csv"
+
+if (load_from == "feather") {
+  ads_sample <- data.table(ads_feather())
+} else if (load_from == "csv") {
+  ads_sample <- list.files("../inst/extdata/csv",
+                           pattern = basename(ads_file_nm),
+                           full.names = TRUE) %>% 
+    fread() %>% 
+    data.table()
+}
+```
+
 ```{r sample_ad_db}
-ads_sample <- data.table(ads_feather())
 # ads_sample <- ads_sample[, sampl_grp := sample(1:2, nrow(ads_sample), replace = TRUE)][sampl_grp == 1]
 ads_sample <- ads_sample[, ':=' (created_at = ymd_hms(created_at),
                                  updated_at = ymd_hms(updated_at))]
