@@ -1,11 +1,13 @@
 ---
 title: "ProPublica Facebook Ad Collector"
-date: "Last updated: `r Sys.Date()`"
-output: 
+output:
   html_document:
-    code_folding: hide
-    toc: true
-    toc_float: true
+    df_print: paged
+    toc: yes
+  html_notebook:
+    toc: yes
+    toc_float: yes
+date: 'Last updated: `r Sys.Date()`'
 ---
 
 ```{r setup, include=FALSE}
@@ -24,7 +26,11 @@ library(htmlwidgets)
 library(ochRe)
 library(dutchmasters)
 set.seed(2018)
+```
 
+At the moment, loading either format of the FB dataset first requires downloading the csv from ProPublica to the directory `/inst/extdata/csv` before sourcing the `load_propub_fb.R` script,
+
+```{r source_script}
 source("../inst/load_propub_fb.R")
 
 theme_set(theme_grey() + 
@@ -33,14 +39,29 @@ theme_set(theme_grey() +
                   panel.grid.major.y = element_line(colour = dutchmasters$milkmaid[[6]])))
 ```
 
-```{r sample_ad_db}
-ads_sample <- data.table(ads_feather())
-# ads_sample <- ads_sample[, sampl_grp := sample(1:2, nrow(ads_sample), replace = TRUE)][sampl_grp == 1]
-ads_sample <- ads_sample[, ':=' (created_at = ymd_hms(created_at),
-                                 updated_at = ymd_hms(updated_at))]
-setkey(ads_sample, created_at)
+```{r data_load}
+load_from <- "feather" # "csv"
 
+if (load_from == "feather") {
+  ads_list <- ads_feather()
+  
+  ads_sample <- data.table(ads_list$ads)
+  ad_targs_sample <- data.table(ads_list$ad_targs)
+  
+  rm(ads_list)
+  
+} else if (load_from == "csv") {
+  ads_sample <- list.files("../inst/extdata/csv",
+                           pattern = basename(ads_file_nm),
+                           full.names = TRUE) %>% 
+    fread() %>% 
+    data.table()
+}
+```
+
+```{r sample_ad_db}
 ads_sample <- ads_sample[created_at >= ymd("2017-10-01"), wk :=  round_date(created_at, "1 week")][!is.na(wk)]
+ad_targs_sample <- ad_targs_sample[id %in% unique(ads_sample$id)]
 ```
 
 ## First-pass data summary
@@ -50,12 +71,11 @@ Looking at the volume of ads over time, ignoring all other variables. Such gener
 ```{r ad_vol_basic, fig.asp=0.5}
 ads_sample[, .N, by = wk] %>% 
   ggplot(aes(wk, N)) +
-  geom_bar(stat = "identity",
-           fill = dutchmasters$milkmaid[[8]],
-           alpha = 1/1.2) +
+  geom_line(colour = dutchmasters$milkmaid[[10]],
+            size = 1.2) +
   geom_smooth(method = "loess",
               colour = dutchmasters$milkmaid[[1]],
-              size = 1.1) +
+              size = 1.1, alpha = 1/3) +
   scale_x_datetime(date_breaks = "2 months", date_labels = "%b %Y") +
   scale_y_continuous(breaks = pretty_breaks(4)) +
   labs(x = NULL, y = "# of Ads",
@@ -67,12 +87,11 @@ Looking at the impressions over time, ignoring all other variables. Such general
 ```{r impressions_vol_basic, fig.asp=0.56}
 ads_sample[,  .(impressions=sum(as.numeric(impressions))), by = wk] %>% 
   ggplot(aes(wk, impressions)) +
-  geom_bar(stat = "identity",
-           fill = dutchmasters$milkmaid[[8]],
-           alpha = 1/1.2) +
+  geom_line(colour = dutchmasters$milkmaid[[10]],
+            size = 1.2) +
   geom_smooth(method = "loess",
               colour = dutchmasters$milkmaid[[1]],
-              size = 1.1) +
+              size = 1.1, alpha = 1/5) +
   scale_x_datetime(date_breaks = "2 months", date_labels = "%b %Y") +
   scale_y_log10(breaks = c(1e1,1e2,1e3,1e4)) +
   annotation_logticks(sides = "l", 
@@ -93,10 +112,10 @@ ads_sample[, .(median=median(political_probability),
                qnt95=quantile(political_probability,0.95)), by = wk] %>% 
   ggplot(aes(wk)) +
   geom_ribbon(aes(ymin = qnt05, ymax = qnt95),
-              fill = dutchmasters$milkmaid[[8]],
+              fill = dutchmasters$milkmaid[[10]],
               alpha = 1/3) +
   geom_ribbon(aes(ymin = qnt25, ymax = qnt75),
-              fill = dutchmasters$milkmaid[[8]],
+              fill = dutchmasters$milkmaid[[10]],
               alpha = 1/2) +
   geom_line(aes(y = median),
             size = 1.1,
@@ -123,12 +142,11 @@ Looks like someone at Facebook or ProPublica changed something in an algorithm i
 ```{r}
 ads_sample[, .(impresh_by_vol = sum(impressions)/.N), by = wk] %>% 
   ggplot(aes(wk, impresh_by_vol)) +
-  geom_bar(stat = "identity",
-           fill = dutchmasters$milkmaid[[8]],
-           alpha = 1/1.2) +
+  geom_line(colour = dutchmasters$milkmaid[[10]],
+            size = 1.2) +
   geom_smooth(method = "loess",
               colour = dutchmasters$milkmaid[[1]],
-              size = 1.1) +
+              size = 1.1, alpha = 1/5) +
   scale_x_datetime(date_breaks = "2 months", date_labels = "%b %Y") +
   scale_y_sqrt(breaks = c(1,2,5,10,20,50,100)) +
   labs(x = NULL, y = "Impressions per Ad",
@@ -139,15 +157,25 @@ ads_sample[, .(impresh_by_vol = sum(impressions)/.N), by = wk] %>%
 
 ## Ad targeting
 
-Beginning work to unpack ad targets. Currently parsing (crudely) with regex, but maybe it's in a recognizable format that can be parsed another way?
+Beginning work to unpack ad targets. Can now access as separate dataset, which can be merged with main dataset to compare targeting labels with other variables.
 
-```{r ad_targets}
-ads_sample[grepl("\\w", targets), targets] %>% 
-  head() %>% 
-  gsub('([":\\}\\]|,\\s|List)', "", .) %>%
-  strsplit('[\\{\\}\\[]*(\\{target|segment)') %>%
-  map( ~ unlist(.x) %>% 
-         .[grepl("[A-Za-z0-9]", .)])
+```{r ad_targets, fig.height = 2, fig.width = 6}
+ad_targs_sample[, .N, by = grepl("United States", target)] %>% 
+  rename(mentions_usa = grepl) %>% 
+  ggplot(aes(1, N, fill = mentions_usa)) +
+  geom_bar(stat = "identity", position = "stack") +
+  geom_text(aes(label = percent(round(N/sum(N),2))),
+            position = position_stack(vjust = 0.5),
+            colour = "white", fontface = "bold", size = rel(5)) +
+  coord_flip() +
+  scale_fill_dutchmasters(palette = "milkmaid") +
+  guides(fill = guide_legend(reverse = TRUE)) +
+  labs(x = NULL, y = NULL, fill = NULL,
+       title = "Proportion of Ads Targeting `United States`",
+       caption = "Source: ProPublica Facebook Political Ad Collector") +
+  theme_void() +
+  theme(legend.position = "bottom",
+        legend.justification = "center")
 ```
 
 ## Future work
